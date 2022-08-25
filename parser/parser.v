@@ -69,6 +69,7 @@ const (
 		'size_t':                 'usize'
 	}
 
+	// NOTE the mapped values aren't used currently, "@" is just prepended automatically.
 	keywords = {
 		'assert':     '@assert'
 		'struct':     '@struct'
@@ -141,6 +142,8 @@ pub:
 	fn_id_prefix     string
 	define_id_prefix string
 
+	fields_structs map[string][]string
+
 	primitives_map map[string]string
 
 	rewrite map[string]map[string]map[string]string
@@ -154,6 +157,17 @@ fn (c Config) get_raw(query string, default toml.Any) toml.Any {
 fn (c Config) get_map(query string) map[string]string {
 	m := c.get_raw(query, map[string]toml.Any{}) as map[string]toml.Any
 	return m.as_strings()
+}
+
+fn (c Config) get_map_of_array(query string) map[string][]string {
+	m := c.get_raw(query, map[string]toml.Any{}) as map[string]toml.Any
+	mut map_of_array := map[string][]string{}
+	for k, v in m {
+		cast_v := v as []toml.Any
+		arr := cast_v.as_strings()
+		map_of_array[k] = arr
+	}
+	return map_of_array
 }
 
 fn (c Config) get_array(query string) []string {
@@ -195,6 +209,7 @@ pub fn config_from_toml(file string) Config {
 		enum_id_prefix: conf.get_string('prefix.enum')
 		fn_id_prefix: conf.get_string('prefix.function')
 		define_id_prefix: conf.get_string('prefix.define')
+		fields_structs: conf.get_map_of_array('fields.structs')
 		primitives_map: conf.get_map('primitives')
 		rewrite: rewrite
 		inject: conf.get_map('inject')
@@ -297,7 +312,7 @@ pub fn (mut p Parser) file_to_v_code(f CFile) string {
 			}
 			CStruct {
 				if node.is_typedef {
-					v_code += p.gen_v_struct_def(node) + '\n\n'
+					v_code += p.gen_v_struct_def(node)! + '\n\n'
 				}
 			}
 			CEnum {
@@ -676,7 +691,7 @@ mut:
 	comment string
 }
 
-fn (cs CStruct) v_name() ?string {
+fn (cs CStruct) v_name() !string {
 	return c_to_v_struct_name(cs.name, cs.prefix)
 }
 
@@ -1293,7 +1308,7 @@ fn is_valid_struct_field_type(str string) bool {
 	return true
 }
 
-fn (p Parser) gen_v_struct_def(strct CStruct) string {
+fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 	mut v_code := ''
 
 	mut st := strct
@@ -1308,6 +1323,8 @@ fn (p Parser) gen_v_struct_def(strct CStruct) string {
 	if st.name == '' {
 		return '/' + '*' + '\nPARSE ERROR:\n' + st.raw + '\n' + '*' + '/'
 	}
+
+	v_name := st.v_name()!
 
 	if st.is_typedef {
 		v_code += '[typedef]\n'
@@ -1421,12 +1438,16 @@ fn (p Parser) gen_v_struct_def(strct CStruct) string {
 	if all_todo {
 		v_code = v_code.replace('\npub mut:', '')
 	}
+	if fields := p.conf.fields_structs[v_name] {
+		for field in fields {
+			v_code += '$field // NOTE Added from chew config\n'
+		}
+	}
 	v_code += '}\n'
 
-	name := st.v_name() or { panic(err) }
-	v_code += 'pub type $name = C.$st.name'
+	v_code += 'pub type $v_name = C.$st.name'
 
-	if name in p.conf.skip_typedefs {
+	if v_name in p.conf.skip_typedefs {
 		return '/' + '* TODO \n' + v_code + '*' + '/'
 	}
 
