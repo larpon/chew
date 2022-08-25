@@ -272,6 +272,17 @@ pub fn (mut p Parser) file_to_v_code(f CFile) string {
 	v_code += '//
 
 '
+	if p.aliases.len > 0 {
+		v_code += '// C typedef aliases used\n'
+		for _, alias in p.aliases {
+			if alias.name != alias.alias {
+				mut v_alias := p.c_to_v_type_name(alias.name)
+				v_code += '// $alias.alias -> $alias.name -> $v_alias\n'
+			}
+		}
+		v_code += '\n'
+	}
+
 	header_offset := v_code.count('\n')
 	for node in f.nodes {
 		match node {
@@ -1811,27 +1822,6 @@ fn (p Parser) gen_vc_fn_call_sig(sig CFnSig) string {
 	r := v_c_sig + args + ')'
 	return r.trim(' ')
 }
-
-// fn gen_vc_arg_pair(c_arg CArg) (string, string) {
-// 	mut out := ''
-// 	mut kind := c_to_v_type_name(c_arg.kind)
-// 	mut name := c_to_v_var_name(c_arg.name)
-
-// 	if _ := keywords[name] {
-// 		name = '@' + name // rewrite
-// 	}
-
-// 	out = name + ' ' + kind
-// 	if out.contains('...') {
-// 		return name, '/*TODO*/'
-// 	}
-
-// 	if c_arg.is_const {
-// 		name = 'const_' + name
-// 	}
-
-// 	return name, kind
-// }
 
 fn (p Parser) gen_vc_arg_pair(c_arg CArg) (string, string) {
 	mut out := ''
