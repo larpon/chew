@@ -35,7 +35,8 @@ fn main() {
 		mut v_code := ''
 		mut file_name := os.file_name(file.path).all_before_last('.').to_lower()
 		if c_headers.len > 1 {
-			file_name += file_name.all_after(conf.struct_id_prefix) // TODO sdl_ ???
+			prefix_id := conf.struct_id_prefix.to_lower()
+			file_name += file_name.all_after(prefix_id)
 			file_name = '${lib_name}.$file_name'
 		}
 

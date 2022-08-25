@@ -1019,9 +1019,7 @@ fn (p Parser) gen_v_enum_def(ce CEnum) string {
 		mut comment := field.comment //.replace('*<', '`$name`')
 
 		mut val := 'C.' + field.name
-		// if field.value != '' {
-		//	val = field.value
-		//}
+
 		if field.value != '' {
 			comment = field.value + ', ' + field.comment
 		}
@@ -1047,8 +1045,6 @@ fn (p Parser) gen_v_enum_def(ce CEnum) string {
 		}
 	}
 	v_code += '}\n'
-
-	// v_code += 'pub type ${c_to_v_struct_name(ce.name)} = C.$ce.name'
 
 	return v_code
 }
