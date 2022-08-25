@@ -4,6 +4,8 @@
 module parser
 
 import os
+// import strings
+import math
 import regex
 import toml
 import toml.ast as tast
@@ -294,7 +296,9 @@ pub fn (mut p Parser) file_to_v_code(f CFile) string {
 				v_code += p.gen_v_fn_callback_def(node) + '\n\n'
 			}
 			CStruct {
-				v_code += p.gen_v_struct_def(node) + '\n\n'
+				if node.is_typedef {
+					v_code += p.gen_v_struct_def(node) + '\n\n'
+				}
 			}
 			CEnum {
 				v_code += p.gen_v_enum_def(node) + '\n\n'
@@ -450,7 +454,23 @@ fn (mut p Parser) parse(mut cf CFile) {
 
 		if line.starts_with('typedef struct') || line.starts_with('typedef union') {
 			if line.contains(';') {
-				mut stts := p.parse_typedef_struct([line])
+				if !line.contains('{') {
+					mut alias := parse_typedef_alias(line) or {
+						eprintln(err)
+						continue
+					}
+					alias.comment = comment
+					comment = ''
+					p.aliases[alias.alias] = alias
+					// cf.nodes << alias
+					continue
+				}
+
+				mut stts := p.parse_struct([line]) or {
+					eprintln(err)
+					continue
+				}
+
 				if stts.len > 0 {
 					stts[0].comment = comment
 					comment = ''
@@ -470,7 +490,11 @@ fn (mut p Parser) parse(mut cf CFile) {
 			})
 			skip = typedefa.len - 1
 
-			mut stts := p.parse_typedef_struct(typedefa)
+			mut stts := p.parse_struct(typedefa) or {
+				eprintln(err)
+				continue
+			}
+
 			if stts.len > 0 {
 				stts[0].comment = comment
 				comment = ''
@@ -508,6 +532,49 @@ fn (mut p Parser) parse(mut cf CFile) {
 			continue
 		}
 		// continue
+
+		if line.starts_with('struct') {
+			if line.contains(';') {
+				mut stts := p.parse_struct([line]) or {
+					eprintln(err)
+					continue
+				}
+
+				if stts.len > 0 {
+					stts[0].comment = comment
+					comment = ''
+				}
+				// p.structs << stts
+
+				for stt in stts {
+					p.structs[stt.name] = stt
+					cf.nodes << stt
+				}
+
+				continue
+			}
+
+			typedefa := eat_lines_until(i, lines, fn (l string) bool {
+				return l.starts_with('}') && l.contains(';')
+			})
+			skip = typedefa.len - 1
+
+			mut stts := p.parse_struct(typedefa) or {
+				eprintln(err)
+				continue
+			}
+
+			if stts.len > 0 {
+				stts[0].comment = comment
+				comment = ''
+			}
+			// p.structs << stts
+
+			for stt in stts {
+				p.structs[stt.name] = stt
+				cf.nodes << stt
+			}
+		}
 
 		if line.starts_with(p.conf.api_export) { //|| line.starts_with('extern DECLSPEC ') { // 'SOKOL_GP_API_DECL'
 			api_export := eat_lines_until(i, lines, fn (l string) bool {
@@ -576,17 +643,24 @@ mut:
 }
 
 struct CField {
-	raw     string
-	kind    string
-	name    string
-	comment string
+	raw             string
+	kind            string
+	name            string
+	comment         string
+	embedded_struct CStruct
 	//	is_const bool
+}
+
+enum CAliasType {
+	primitive
+	_struct
 }
 
 struct CAlias {
 	raw   string
 	name  string
 	alias string
+	typ   CAliasType = .primitive
 mut:
 	comment string
 }
@@ -975,10 +1049,40 @@ fn (p Parser) gen_v_const(cd CDefine) ?string {
 	return v_code
 }
 
-fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
-	// eprintln('Parsing struct: $lines')
+fn (p Parser) filter_ifdefs(lines []string) []string {
+	mut sanitized := []string{}
+	mut skip_line := false
+	for line in lines {
+		if line.trim_space().contains('#ifdef') {
+			skip_line = true
+			continue
+		}
+		if line.trim_space().contains('#endif') {
+			skip_line = false
+			continue
+		}
 
-	raw := '${lines.join('\n')}'
+		if skip_line {
+			continue
+		}
+		sanitized << line
+	}
+	return sanitized
+}
+
+fn (p Parser) parse_struct(lines []string) ![]CStruct {
+	// eprintln('Parsing struct: $lines')
+	if lines.len == 0 {
+		return error('no lines')
+	}
+
+	sanitized := p.filter_ifdefs(lines)
+
+	raw := sanitized.join('\n')
+	mut is_typedef := false
+	if raw.contains('typedef') {
+		is_typedef = true
+	}
 
 	is_union := raw.all_before('{').contains('union')
 	mut line := ''
@@ -986,7 +1090,7 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 		line = lines[0]
 		tokens := line.split(' ')
 
-		mut c_name := '/' + '* TODO *' + '/'
+		mut c_name := '/' + '*' + ' TODO ' + '*' + '/'
 		if tokens.len > 3 {
 			c_name = tokens[3].trim('{').trim(';')
 		}
@@ -999,13 +1103,13 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 				raw: raw
 				name: c_name
 				prefix: p.conf.struct_id_prefix
-				is_typedef: true
+				is_typedef: is_typedef
 				is_union: is_union
 			},
 		]
 	}
 
-	flat := lines.join(' ').replace('\n', '')
+	flat := sanitized.join(' ').replace('\n', '')
 	// tokens := flat.split(' ')
 	mut raw_members := flat.all_after('{').all_before_last('}').trim(' ')
 	raw_members = raw_members.replace('*/', '*/;')
@@ -1013,13 +1117,44 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 	raw_members = raw_members.replace('* /', '*/')
 	// TODO .replace('[] ',' []') //.replace('const ','')
 	// eprintln('C Struct raw members: $raw_members')
+	raw_members = raw_members.split(' ').filter(it.trim_space() != '').join(' ')
 
-	raw_struct_ids := flat.all_after_last('}').trim(' ').all_before_last(';').replace(' ',
+	mut raw_struct_ids := flat.all_after_last('}').trim(' ').all_before_last(';').replace(' ',
 		'').split(',')
 
-	mut members := raw_members.split(';')
+	if !is_typedef {
+		struct_id := flat.all_before('{').all_after('struct').trim_space()
+		raw_struct_ids = [
+			struct_id,
+		]
+	}
+
+	raw_members = raw_members.replace('; }', ' }')
+	// em_raw_members := raw_members
+	i_members := raw_members.split(';').map(it.trim_space()).filter(it != '')
+	mut members := []string{}
+	// eprintln(i_members)
+	// eprintln('-')
+	mut buf := ''
+	for i_member in i_members {
+		if i_member.starts_with('/*') && !i_member.contains('}') {
+			members << i_member
+			continue
+		}
+		if i_member.contains('}') {
+			buf += ' ' + i_member
+			members << buf
+			buf = ''
+		} else if i_member.contains('{') {
+			buf += ' ' + i_member
+		} else if buf != '' {
+			buf += ' ' + i_member
+		} else {
+			members << i_member
+		}
+	}
 	members = members.filter(it != '')
-	members = members.map(it.trim(' '))
+	members = members.map(it.trim_space())
 
 	//@ eprintln('C Struct members: $members')
 
@@ -1033,6 +1168,7 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 			continue
 		}
 
+		mut embedded_struct := CStruct{}
 		msplit := member.split(' ')
 
 		if msplit[0].starts_with('/*') {
@@ -1045,9 +1181,34 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 			mut name := msplit[1]
 
 			mut c_id := 2
-			if kind == 'struct' || kind == 'union' {
-				kind = msplit[0] + ' ' + msplit[1]
-				name = msplit[2]
+			if kind in ['struct', 'union'] {
+				mut s_or_u := member
+
+				// TODO YUK-sauce
+				// if 'ma_device' in raw_struct_ids {
+				mut rewritten := ''
+				mut c := f32(1)
+				for ch in s_or_u {
+					mut put := ch.ascii_str()
+					if ch.is_space() {
+						if math.mod(c, 2) == 0 {
+							put = ';' + put
+						}
+						c++
+					}
+					rewritten += put
+				}
+				s_or_u = rewritten.replace('{;', '{\n')
+				// s_or_u += ''
+				// eprintln(s_or_u)
+				// }
+
+				// kind = msplit[0] + ' ' + msplit[1]
+				// name = msplit[2]
+				embedded_structs := p.parse_struct([s_or_u])!
+				if embedded_structs.len > 0 {
+					embedded_struct = embedded_structs[0]
+				}
 				c_id++
 			}
 
@@ -1074,6 +1235,7 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 				kind: kind
 				name: name
 				comment: comment
+				embedded_struct: embedded_struct
 			}
 		}
 	}
@@ -1082,15 +1244,24 @@ fn (p Parser) parse_typedef_struct(lines []string) []CStruct {
 	// eprintln(members)
 	for struct_id in raw_struct_ids {
 		// struct_id
+		if !is_typedef {
+			if alias := p.aliases[struct_id] {
+				if alias.typ == ._struct {
+					is_typedef = true
+				}
+			}
+		}
 
-		c_structs << CStruct{
+		c_struct := CStruct{
 			raw: raw
 			name: struct_id
 			prefix: p.conf.struct_id_prefix
-			is_typedef: true
+			is_typedef: is_typedef
 			is_union: is_union
 			fields: fields
 		}
+
+		c_structs << c_struct
 	}
 
 	return c_structs
@@ -1122,9 +1293,10 @@ fn is_valid_struct_field_type(str string) bool {
 	return true
 }
 
-fn (p Parser) gen_v_struct_def(st CStruct) string {
+fn (p Parser) gen_v_struct_def(strct CStruct) string {
 	mut v_code := ''
 
+	mut st := strct
 	/*
 	v_code += '// NOTE\n'
 	v_code += '/'+'*'
@@ -1147,12 +1319,24 @@ fn (p Parser) gen_v_struct_def(st CStruct) string {
 	v_code += '$type_keyword C.$st.name {'
 
 	if st.fields.len > 0 {
-		v_code += '\n'
+		v_code += '\npub mut:\n'
 	}
 
+	mut all_todo := true
 	mut written_field_names := []string{}
 	for field in st.fields {
 		// mut kind_clean := field.kind.replace('*','').replace('const', '').trim(' ')
+
+		if field.kind in ['struct', 'union'] {
+			// v_code += '\n/' + '*\n' + field.embedded_struct.str() + '\n*' + '/\n'
+			es_lines := field.embedded_struct.raw.split('\n')
+			v_code += '\n// TODO'
+			for ln in es_lines {
+				v_code += '// ' + ln + '\n'
+			}
+			continue
+		}
+
 		mut kind := p.c_to_v_type_name(field.kind)
 
 		mut name := field.name
@@ -1160,6 +1344,8 @@ fn (p Parser) gen_v_struct_def(st CStruct) string {
 		if name in written_field_names {
 			continue
 		}
+
+		skip := kind in p.conf.skip_typedefs
 
 		mut is_fn_callback_sig := false
 		if field.raw.count('(') > 0 {
@@ -1195,10 +1381,18 @@ fn (p Parser) gen_v_struct_def(st CStruct) string {
 			comment = comment.replace('   ', '').replace('  ', '').replace('  ', ' ')
 		}
 
-		field_v_code := '\t$name $kind $comment\n'
-		if is_fn_callback_sig
+		mut init_value := ''
+		if kind.starts_with('&') {
+			init_value = '= unsafe { nil }'
+		}
+
+		field_v_code := '\t$name $kind $init_value $comment\n'
+		if skip {
+			v_code += '// TODO ' + field_v_code
+		} else if is_fn_callback_sig
 			|| (is_valid_struct_field_name(name) && is_valid_struct_field_type(kind)) {
 			v_code += field_v_code
+			all_todo = false
 		} else if kind.contains('[') {
 			const_value := kind.all_after('[').all_before(']')
 			c_type := kind.all_after(']')
@@ -1214,6 +1408,7 @@ fn (p Parser) gen_v_struct_def(st CStruct) string {
 				rr = ''
 			}
 			if rr != '' {
+				all_todo = false
 				v_code += field_v_code.replace(const_value, rr)
 			} else {
 				v_code += '// TODO ' + field_v_code
@@ -1222,6 +1417,9 @@ fn (p Parser) gen_v_struct_def(st CStruct) string {
 			v_code += '// TODO ' + field_v_code
 		}
 		written_field_names << name
+	}
+	if all_todo {
+		v_code = v_code.replace('\npub mut:', '')
 	}
 	v_code += '}\n'
 
@@ -1242,16 +1440,30 @@ fn parse_typedef_alias(line string) !CAlias {
 
 	mut split := normalized.all_after('typedef ').all_before(';').trim(' ').split(' ')
 	split = split.filter(it != '')
-	if split.len != 2 {
-		return error('could not parse C alias "$raw"')
+	if split.len == 2 {
+		name := split[0].trim_space()
+		alias := split[1].trim_space()
+		return CAlias{
+			raw: raw
+			name: name
+			alias: alias
+			typ: .primitive
+		}
 	}
-	name := split[0]
-	alias := split[1]
-	return CAlias{
-		raw: raw
-		name: name
-		alias: alias
+	if split.len == 3 {
+		typ := split[0].trim_space()
+		name := split[1].trim_space()
+		alias := split[2].trim_space()
+		if typ == 'struct' {
+			return CAlias{
+				raw: raw
+				name: name
+				alias: alias
+				typ: ._struct
+			}
+		}
 	}
+	return error('could not parse C alias "$raw"')
 }
 
 fn parse_typedef_fn_callback(lines []string) CFnCallbackSig {
