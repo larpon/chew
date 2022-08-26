@@ -26,7 +26,7 @@ solely for personal use - I released it only because some *might* find it useful
 
 # Usage
 
-Currently chew expects that you setup your own V <-> C includes for each module you want to wrap.
+Currently `chew` expects that you setup your own V <-> C includes for each module you want to wrap.
 
 Basically `chew` expects your V module to have a sub-folder named `c` with V files doing the actual C setup.
 See [Larpon/miniaudio](https://github.com/Larpon/miniaudio/blob/master/c/miniaudio.c.v) for an example setup that works.
