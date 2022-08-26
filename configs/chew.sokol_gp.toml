@@ -1,0 +1,25 @@
+lib_name = 'sgp'
+
+imports = ['sokol.gfx']
+
+[api]
+    export = 'SOKOL_GP_API_DECL'
+    inline = 'SGP_INLINE'
+
+[prefix]
+	struct = 'sgp_'
+	enum = 'sgp_'
+	define = 'SGP_'
+	function = 'sgp_'
+
+[primitives]
+	uint32_t = 'u32'
+	'sg_primitive_type' = 'gfx.PrimitiveType'
+	'sg_shader_desc' = 'gfx.ShaderDesc'
+	'sg_pipeline' = 'gfx.Pipeline'
+	'sg_image' = 'gfx.Image'
+	'sgp_point' = 'Vec2' # chew BUG ?
+
+[stop-marker]
+	line_starts_with = '#endif // SOKOL_GP_INCLUDED'
+
