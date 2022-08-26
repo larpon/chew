@@ -67,6 +67,15 @@ const (
 		'long double':            'f64'
 		//
 		'size_t':                 'usize'
+		// stdint.h
+		'int8_t':                 'i8'
+		'uint8_t':                'u8'
+		'uint16_t':               'u16'
+		'int16_t':                'i16'
+		'int32_t':                'int'
+		'uint32_t':               'u32'
+		'int64_t':                'i64'
+		'uint64_t':               'u64'
 	}
 
 	// NOTE the mapped values aren't used currently, "@" is just prepended automatically.

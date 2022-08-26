@@ -13,7 +13,6 @@ imports = ['sokol.gfx']
 	function = 'sgp_'
 
 [primitives]
-	uint32_t = 'u32'
 	'sg_primitive_type' = 'gfx.PrimitiveType'
 	'sg_shader_desc' = 'gfx.ShaderDesc'
 	'sg_pipeline' = 'gfx.Pipeline'
