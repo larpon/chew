@@ -780,7 +780,7 @@ fn c_to_v_struct_name(sn string, prefix string) string {
 fn (p Parser) parse_typedef_enum(lines []string) []CEnum {
 	// eprintln('Parsing enum: $lines')
 
-	raw := '${lines.join('\n')}'
+	raw := lines.join('\n').trim_space()
 
 	flat := lines.join(' ').replace('\n', '')
 	raw_enum_ids := flat.all_after_last('}').trim(' ').all_before_last(';').replace(' ',
@@ -1179,7 +1179,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 
 	sanitized := p.filter_ifdefs(lines)
 
-	raw := sanitized.join('\n')
+	raw := sanitized.join('\n').trim_space()
 	mut is_typedef := false
 	if raw.contains('typedef') {
 		is_typedef = true
