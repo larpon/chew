@@ -159,6 +159,8 @@ pub:
 
 	rewrite map[string]map[string]map[string]string
 	inject  map[string]string
+
+	v_fmt bool
 }
 
 fn (c Config) get_raw(query string, default toml.Any) toml.Any {
@@ -271,7 +273,7 @@ pub fn (mut p Parser) parse_file(path string) {
 	p.parse(mut f)
 }
 
-pub fn (mut p Parser) file_to_v_code(f CFile) string {
+pub fn (mut p Parser) file_to_v_code(f CFile) !string {
 	filename := os.file_name(f.path)
 
 	lib_name := p.conf.lib_name
@@ -383,7 +385,9 @@ fn (mut p Parser) parse(mut cf CFile) {
 	for i, imline in lines {
 		mut line := imline
 
-		if line.starts_with(p.conf.get_string('stop-marker.line_starts_with')) {
+		stop_marker := p.conf.get_string('stop-marker.line_starts_with')
+		if stop_marker != '' && line.starts_with(stop_marker) {
+			println('Stopping parsing at line $i')
 			break
 		}
 
@@ -699,6 +703,7 @@ struct CField {
 	kind            string
 	name            string
 	comment         string
+	comment_above   string
 	embedded_struct CStruct
 	//	is_const bool
 }
@@ -1186,7 +1191,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		return error('no lines')
 	}
 
-	sanitized := p.filter_ifdefs(lines)
+	mut sanitized := p.filter_ifdefs(lines)
 
 	raw := sanitized.join('\n').trim_space()
 	mut is_typedef := false
@@ -1219,6 +1224,13 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		]
 	}
 
+	for i := 0; i < sanitized.len; i++ {
+		mut s := sanitized[i]
+		if s.trim_space().starts_with('//') {
+			s = s + '%%%%'
+			sanitized[i] = s
+		}
+	}
 	flat := sanitized.join(' ').replace('\n', '')
 	// tokens := flat.split(' ')
 	mut raw_members := flat.all_after('{').all_before_last('}').trim(' ')
@@ -1247,6 +1259,13 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 	// eprintln('-')
 	mut buf := ''
 	for i_member in i_members {
+		if i_member.contains('%%%%') {
+			i_sp := i_member.split('%%%%')
+			for sp in i_sp {
+				members << sp
+			}
+			continue
+		}
 		if i_member.starts_with('/*') && !i_member.contains('}') {
 			members << i_member
 			continue
@@ -1269,8 +1288,8 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 	//@ eprintln('C Struct members: $members')
 
 	mut fields := []CField{}
-	// mut in_comment := false
-	// mut comment := ''
+	mut in_block_comment := false
+	mut comment_above := ''
 	mut skip := 0
 	for i, member in members {
 		if skip > 0 {
@@ -1281,8 +1300,21 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		mut embedded_struct := CStruct{}
 		msplit := member.split(' ')
 
-		if msplit[0].starts_with('/*') {
-			// last_comment = member
+		if msplit[0].starts_with('/' + '*') && !msplit[0].contains('*' + '/') {
+			comment_above += member
+			in_block_comment = true
+			continue
+		}
+
+		if in_block_comment && msplit[0].contains('*' + '/') {
+			comment_above += member
+			in_block_comment = false
+			continue
+		}
+
+		if msplit[0].trim_space().starts_with('//') {
+			comment_above += member.all_after('//').trim_space() + '\n'
+			// println('CA: $comment_above')
 			continue
 		}
 
@@ -1310,15 +1342,28 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 					raw: member
 					kind: kind
 					name: name
+					comment_above: comment_above
 					comment: comment
 					// embedded_struct: embedded_struct
 				}
+
+				if comment_above != '' {
+					comment_above = ''
+				}
 			}
 		} else if msplit.len >= 2 {
-			mut kind := msplit[0]
-			mut name := msplit[1]
-
+			mut kind := msplit[0].trim_space()
+			mut name := msplit[1].trim_space()
 			mut c_id := 2
+
+			if kind == 'const' {
+				kind = name
+				if msplit.len >= 3 {
+					name = msplit[2].trim_space()
+					c_id++
+				}
+			}
+
 			if kind in ['struct', 'union'] {
 				mut s_or_u := member
 
@@ -1351,6 +1396,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 			}
 
 			mut comment := '' // last_comment
+
 			// last_comment = ''
 			if msplit.len > c_id {
 				comment = msplit[c_id]
@@ -1372,8 +1418,13 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 				raw: member
 				kind: kind
 				name: name
+				comment_above: comment_above
 				comment: comment
 				embedded_struct: embedded_struct
+			}
+
+			if comment_above != '' {
+				comment_above = ''
 			}
 		}
 	}
@@ -1525,7 +1576,19 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 			init_value = '= unsafe { nil }'
 		}
 
-		field_v_code := '\t$name $kind $init_value $comment\n'
+		mut comment_above := field.comment_above
+		if comment_above != '' {
+			ca_sp := comment_above.split('\n')
+			comment_above = ''
+			for ca in ca_sp {
+				mut cleaned := ca.replace('/*', '').replace('*/', '').replace('*<', '').trim(' ')
+				cleaned = cleaned.replace(r'* \brief', '').replace(r'\brief', '')
+				cleaned = cleaned.replace('   ', '').replace('  ', '').replace('  ', ' ')
+				comment_above += '// ' + cleaned + '\n'
+			}
+		}
+
+		field_v_code := '\t$comment_above\n\t$name $kind $init_value $comment\n'
 		if skip {
 			v_code += '// TODO ' + field_v_code
 		} else if is_fn_callback_sig

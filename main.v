@@ -40,14 +40,14 @@ fn main() {
 			file_name = '${lib_name}.$file_name'
 		}
 
-		v_code += parser.file_to_v_code(file)
+		v_code += parser.file_to_v_code(file)!
 
 		// Write file to disk before fmt
 		tmp_path := os.temp_dir()
 		os.write_file(os.real_path(os.join_path(tmp_path, '${file_name}.auto.pre-fmt.c.v')),
 			v_code) or { panic(err) }
 
-		v_code = chep.vfmt(v_code) // or {	}
+		// v_code = chep.vfmt(v_code) // or {	}
 		os.write_file(os.real_path(os.join_path(output_path, '${file_name}.auto.c.v')),
 			v_code) or { panic(err) }
 	}

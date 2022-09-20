@@ -1,0 +1,21 @@
+lib_name = 'wren'
+
+[api]
+    export = 'WREN_API'
+    inline = 'WREN_API_INLINE'
+
+[prefix]
+	struct = 'Wren'
+	enum = 'WREN_'
+	define = 'WREN_'
+	function = 'wren'
+
+[rewrite]
+
+    [rewrite.value]
+    [rewrite.value.const]
+        'null' = 'unsafe{ nil }'
+        'version_string' = "'${version_major}.${version_minor}.$version_patch'"
+
+[stop-marker]
+	eof = true
