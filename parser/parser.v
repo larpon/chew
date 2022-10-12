@@ -1544,6 +1544,12 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 				kind = p.gen_v_fn_callback_field_def(fnts)
 				is_fn_callback_sig = true
 				name = name.all_after('(').trim('* ')
+				// sokol special??
+				if name.contains(')') {
+					name = name.all_before(')')
+					kind = 'fn' + kind.all_after('fn')
+				}
+				// println('name: "$name" kind: "$kind"')
 			} else {
 				v_code += '\t// TODO $field.raw\n'
 				continue
@@ -1588,7 +1594,19 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 			}
 		}
 
-		field_v_code := '\t$comment_above\n\t$name $kind $init_value $comment\n'
+		mut field_v_code := '\t'
+		if comment_above != '' {
+			field_v_code += '$comment_above\n\t'
+		}
+		field_v_code += '$name $kind'
+		if init_value != '' {
+			field_v_code += ' $init_value'
+		}
+		if comment != '' {
+			field_v_code += ' $comment'
+		}
+		field_v_code += '\n'
+
 		if skip {
 			v_code += '// TODO ' + field_v_code
 		} else if is_fn_callback_sig
