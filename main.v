@@ -7,9 +7,9 @@ import os
 import chew.parser as chep
 
 fn main() {
-	input_path := os.args[1]
-	output_path := os.args[2]
-	config_path := os.args[3]
+	config_path := os.args[1]
+	input_path := os.args[2]
+	output_path := os.args[3]
 
 	if !os.exists(output_path) {
 		os.mkdir_all(output_path) or { panic(err) }

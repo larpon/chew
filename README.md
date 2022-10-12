@@ -34,14 +34,14 @@ See [Larpon/miniaudio](https://github.com/Larpon/miniaudio/blob/master/c/miniaud
 The output(s) of chew is then expected to live at the module root - where it can do `import c`.
 
 Basic run:
-`v run ~/.vmodules/chew <header file or dir> <output dir> <toml project config file>`
+`v run ~/.vmodules/chew <toml project config file> <header file or dir> <output dir>`
 
 # Example
 
 ```
 cd /tmp
 git clone https://github.com/mackron/miniaudio.git
-v run ~/.vmodules/chew ./miniaudio/miniaudio.h /tmp ~/.vmodules/chew/configs/chew.miniaudio.toml
+v run ~/.vmodules/chew ~/.vmodules/chew/configs/chew.miniaudio.toml ./miniaudio/miniaudio.h /tmp
 cat /tmp/miniaudio.auto.c.v
 # ... copy /tmp/miniaudio.auto.c.v to the V module wrapper root. E.g: cp miniaudio.auto.c.v ~/.vmodules/miniaudio
 ```
