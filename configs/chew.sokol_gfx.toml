@@ -1,8 +1,8 @@
 lib_name = 'gfx'
 
 [api]
-    export = 'SOKOL_GFX_API_DECL'
-    inline = 'inline '
+	export = 'SOKOL_GFX_API_DECL'
+	inline = 'inline '
 
 [prefix]
 	struct = 'sg_'
@@ -11,14 +11,14 @@ lib_name = 'gfx'
 	function = 'sg_'
 
 [fields]
-    [fields.structs]
-        'Buffer' = ['id u32']
-        'Image' = ['id u32']
-        'Shader' = ['id u32']
-        'Pipeline' = ['id u32']
-        'Pass' = ['id u32']
-        'Context' = ['id u32']
-        'Color' = ['r f32','g f32', 'b f32','a f32']
+	[fields.structs]
+		'Buffer' = ['id u32']
+		'Image' = ['id u32']
+		'Shader' = ['id u32']
+		'Pipeline' = ['id u32']
+		'Pass' = ['id u32']
+		'Context' = ['id u32']
+		'Color' = ['r f32','g f32', 'b f32','a f32']
 
 [stop-marker]
 	line_starts_with = '#endif // SOKOL_GFX_INCLUDED'

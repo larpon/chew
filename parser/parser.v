@@ -164,16 +164,27 @@ pub:
 }
 
 fn (c Config) get_raw(query string, default toml.Any) toml.Any {
+	$if debug ? {
+		eprintln('${@MOD}.${@FN}({query},...)')
+	}
 	return c.toml_doc.value(query).default_to(default)
 }
 
 fn (c Config) get_map(query string) map[string]string {
-	m := c.get_raw(query, map[string]toml.Any{}) as map[string]toml.Any
+	$if debug ? {
+		eprintln('${@MOD}.${@FN}({query},...)')
+	}
+	dm := map[string]toml.Any{}
+	m := c.get_raw(query, dm) as map[string]toml.Any
 	return m.as_strings()
 }
 
 fn (c Config) get_map_of_array(query string) map[string][]string {
-	m := c.get_raw(query, map[string]toml.Any{}) as map[string]toml.Any
+	$if debug ? {
+		eprintln('${@MOD}.${@FN}({query},...)')
+	}
+	dma := map[string]toml.Any{}
+	m := c.get_raw(query, dma) as map[string]toml.Any
 	mut map_of_array := map[string][]string{}
 	for k, v in m {
 		cast_v := v as []toml.Any
@@ -184,11 +195,17 @@ fn (c Config) get_map_of_array(query string) map[string][]string {
 }
 
 fn (c Config) get_array(query string) []string {
+	$if debug ? {
+		eprintln('${@MOD}.${@FN}({query},...)')
+	}
 	a := c.get_raw(query, []toml.Any{}) as []toml.Any
 	return a.as_strings()
 }
 
 fn (c Config) get_string(query string) string {
+	$if debug ? {
+		eprintln('${@MOD}.${@FN}({query},...)')
+	}
 	return c.get_raw(query, '').string()
 }
 
@@ -198,6 +215,7 @@ pub fn config_from_toml(file string) Config {
 		eprintln('Using $file')
 		toml_doc = toml.parse_file(file) or { parser.empty_toml_doc }
 	}
+	assert toml_doc.ast != unsafe { nil }
 	// return toml.parse_text('') or { empty_toml_doc }
 	// toml_doc.value('wrong.key').default_to(123).int()
 	mut conf := Config{
