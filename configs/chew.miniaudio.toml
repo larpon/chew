@@ -16,6 +16,7 @@ lib_name = 'miniaudio'
     [rewrite.value.const]
         'null' = 'unsafe{ nil }'
         'version_string' = "'${version_major}.${version_minor}.$version_revision'"
+        'sound_source_channel_count' = 'u32(0xFFFFFFFF)' # Quiet a V compiler error
 
 [inject]
     '0' = """
