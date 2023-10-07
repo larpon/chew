@@ -37,7 +37,7 @@ fn main() {
 		if c_headers.len > 1 {
 			prefix_id := conf.struct_id_prefix.to_lower()
 			file_name += file_name.all_after(prefix_id)
-			file_name = '${lib_name}.$file_name'
+			file_name = '${lib_name}.${file_name}'
 		}
 
 		v_code += parser.file_to_v_code(file)!
