@@ -1524,7 +1524,7 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 
 	type_keyword := if st.is_union { 'union' } else { 'struct' }
 
-	v_code += '${type_keyword} C.${st.name} {'
+	v_code += 'pub ${type_keyword} C.${st.name} {'
 
 	if st.fields.len > 0 {
 		v_code += '\npub mut:\n'
