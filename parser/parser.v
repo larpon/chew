@@ -16,123 +16,118 @@ import v.fmt
 import v.parser as vparser
 import v.pref
 
-const (
-	// regex_params_in_comment = regex.regex_opt(r'\\param\s+([\w\-\(\)]+)(\s|\.|,|$)') or { panic(err) }
-	// regex_c_in_comment = regex.regex_opt(r'\\c|a\s+([\w\->\(\)]+)(\s|\.|,|$)') or { panic(err) }
-	// regex_cs_triple_in_comment = regex.regex_opt(r'//\s+(```)') or { panic(err) }
-	regex_block_comment = regex.regex_opt(r'§(.*)¾') or { panic(err) }
-		// regex_word = regex.regex_opt(r'\w+') or { panic(err) }
-)
+// regex_params_in_comment = regex.regex_opt(r'\\param\s+([\w\-\(\)]+)(\s|\.|,|$)') or { panic(err) }
+// regex_c_in_comment = regex.regex_opt(r'\\c|a\s+([\w\->\(\)]+)(\s|\.|,|$)') or { panic(err) }
+// regex_cs_triple_in_comment = regex.regex_opt(r'//\s+(```)') or { panic(err) }
+const regex_block_comment = regex.regex_opt(r'§(.*)¾') or { panic(err) } // regex_word = regex.regex_opt(r'\w+') or { panic(err) }
 
-const (
-	c_to_v_type_map = {
-		'bool':                   'bool'
-		//
-		'char':                   'char'
-		'signed char':            'i8'
-		'unsigned char':          'u8'
-		//
-		'short':                  'i16'
-		'short int':              'i16'
-		'signed short':           'i16'
-		'signed short int':       'i16'
-		//
-		'unsigned short':         'u16'
-		'unsigned short int':     'u16'
-		//'wchar_t':                'u16'
-		//
-		'int':                    'int'
-		'signed':                 'int'
-		'signed int':             'int'
-		'unsigned':               'u32'
-		'unsigned int':           'u32'
-		'long':                   'int'
-		'long int':               'int'
-		'signed long':            'int'
-		'signed long int':        'int'
-		//
-		'unsigned long':          'u32'
-		'unsigned long int':      'u32'
-		//
-		'long long':              'i64'
-		'long long int':          'i64'
-		'signed long long':       'i64'
-		'signed long long int':   'i64'
-		//
-		'unsigned long long':     'u64'
-		'unsigned long long int': 'u64'
-		//
-		'float':                  'f32'
-		'double':                 'f64'
-		'long double':            'f64'
-		//
-		'size_t':                 'usize'
-		// stdint.h
-		'int8_t':                 'i8'
-		'uint8_t':                'u8'
-		'uint16_t':               'u16'
-		'int16_t':                'i16'
-		'int32_t':                'int'
-		'uint32_t':               'u32'
-		'int64_t':                'i64'
-		'uint64_t':               'u64'
-	}
+const c_to_v_type_map = {
+	'bool':                   'bool'
+	//
+	'char':                   'char'
+	'signed char':            'i8'
+	'unsigned char':          'u8'
+	//
+	'short':                  'i16'
+	'short int':              'i16'
+	'signed short':           'i16'
+	'signed short int':       'i16'
+	//
+	'unsigned short':         'u16'
+	'unsigned short int':     'u16'
+	//'wchar_t':                'u16'
+	//
+	'int':                    'int'
+	'signed':                 'int'
+	'signed int':             'int'
+	'unsigned':               'u32'
+	'unsigned int':           'u32'
+	'long':                   'int'
+	'long int':               'int'
+	'signed long':            'int'
+	'signed long int':        'int'
+	//
+	'unsigned long':          'u32'
+	'unsigned long int':      'u32'
+	//
+	'long long':              'i64'
+	'long long int':          'i64'
+	'signed long long':       'i64'
+	'signed long long int':   'i64'
+	//
+	'unsigned long long':     'u64'
+	'unsigned long long int': 'u64'
+	//
+	'float':                  'f32'
+	'double':                 'f64'
+	'long double':            'f64'
+	//
+	'size_t':                 'usize'
+	// stdint.h
+	'int8_t':                 'i8'
+	'uint8_t':                'u8'
+	'uint16_t':               'u16'
+	'int16_t':                'i16'
+	'int32_t':                'int'
+	'uint32_t':               'u32'
+	'int64_t':                'i64'
+	'uint64_t':               'u64'
+}
 
-	// NOTE the mapped values aren't used currently, "@" is just prepended automatically.
-	keywords = {
-		'assert':     '@assert'
-		'struct':     '@struct'
-		'if':         '@if'
-		'it':         'ti'
-		'else':       '@else'
-		'asm':        '@asm'
-		'return':     '@return'
-		'module':     '@module'
-		'sizeof':     '@sizeof'
-		'isreftype':  'isreftyp'
-		'_likely_':   'likly'
-		'_unlikely_': 'unlikly'
-		'go':         '@go'
-		'goto':       '@goto'
-		'const':      '@const'
-		'mut':        'mute'
-		'shared':     '@shared'
-		'lock':       '@lock'
-		'rlock':      '@rlock'
-		'type':       '@type'
-		'for':        'fro'
-		'fn':         'func'
-		'true':       'yes'
-		'false':      'nope'
-		'continue':   'keepgoing'
-		'break':      'smash'
-		'import':     'imported'
-		'unsafe':     'not_safe'
-		'typeof':     'kind'
-		'dump':       'dmp'
-		'enum':       'num'
-		'interface':  'iface'
-		'pub':        'publ'
-		'in':         'i_n'
-		'atomic':     'atmic'
-		'or':         'orr'
-		'__global':   'glbl'
-		'union':      'onion'
-		'static':     'sttc'
-		'volatile':   'vola'
-		'as':         'aas'
-		'defer':      'defr'
-		'match':      'mtch'
-		'select':     'slct'
-		'none':       'non'
-		'__offsetof': 'offsof'
-		'is':         'iss'
-	}
+// NOTE the mapped values aren't used currently, "@" is just prepended automatically.
+const keywords = {
+	'assert':     '@assert'
+	'struct':     '@struct'
+	'if':         '@if'
+	'it':         'ti'
+	'else':       '@else'
+	'asm':        '@asm'
+	'return':     '@return'
+	'module':     '@module'
+	'sizeof':     '@sizeof'
+	'isreftype':  'isreftyp'
+	'_likely_':   'likly'
+	'_unlikely_': 'unlikly'
+	'go':         '@go'
+	'goto':       '@goto'
+	'const':      '@const'
+	'mut':        'mute'
+	'shared':     '@shared'
+	'lock':       '@lock'
+	'rlock':      '@rlock'
+	'type':       '@type'
+	'for':        'fro'
+	'fn':         'func'
+	'true':       'yes'
+	'false':      'nope'
+	'continue':   'keepgoing'
+	'break':      'smash'
+	'import':     'imported'
+	'unsafe':     'not_safe'
+	'typeof':     'kind'
+	'dump':       'dmp'
+	'enum':       'num'
+	'interface':  'iface'
+	'pub':        'publ'
+	'in':         'i_n'
+	'atomic':     'atmic'
+	'or':         'orr'
+	'__global':   'glbl'
+	'union':      'onion'
+	'static':     'sttc'
+	'volatile':   'vola'
+	'as':         'aas'
+	'defer':      'defr'
+	'match':      'mtch'
+	'select':     'slct'
+	'none':       'non'
+	'__offsetof': 'offsof'
+	'is':         'iss'
+}
 
-	empty_toml_doc = toml.Doc{
-		ast: &tast.Root(unsafe { nil })
-	}
-)
+const empty_toml_doc = toml.Doc{
+	ast: &tast.Root(unsafe { nil })
+}
 
 pub struct Config {
 	toml_doc toml.Doc = parser.empty_toml_doc
@@ -229,28 +224,28 @@ pub fn config_from_toml(file string) Config {
 	}
 	rewrite['value']['const'] = conf.get_map('rewrite.value.const')
 	return Config{
-		toml_doc: toml_doc
-		lib_name: conf.get_string('lib_name')
-		api_export: conf.get_string('api.export')
-		api_inline: conf.get_string('api.inline')
-		imports: conf.get_array('imports')
-		skip_typedefs: conf.get_array('skip.typedefs')
-		skip_keywords: conf.get_array('skip.keywords')
-		skip_files: conf.get_array('skip.files')
+		toml_doc:         toml_doc
+		lib_name:         conf.get_string('lib_name')
+		api_export:       conf.get_string('api.export')
+		api_inline:       conf.get_string('api.inline')
+		imports:          conf.get_array('imports')
+		skip_typedefs:    conf.get_array('skip.typedefs')
+		skip_keywords:    conf.get_array('skip.keywords')
+		skip_files:       conf.get_array('skip.files')
 		struct_id_prefix: conf.get_string('prefix.struct')
-		enum_id_prefix: conf.get_string('prefix.enum')
-		fn_id_prefix: conf.get_string('prefix.function')
+		enum_id_prefix:   conf.get_string('prefix.enum')
+		fn_id_prefix:     conf.get_string('prefix.function')
 		define_id_prefix: conf.get_string('prefix.define')
-		fields_structs: conf.get_map_of_array('fields.structs')
-		primitives_map: conf.get_map('primitives')
-		rewrite: rewrite
-		inject: conf.get_map('inject')
+		fields_structs:   conf.get_map_of_array('fields.structs')
+		primitives_map:   conf.get_map('primitives')
+		rewrite:          rewrite
+		inject:           conf.get_map('inject')
 	}
 }
 
 pub fn vfmt(v_code string) string {
 	fpref := pref.Preferences{
-		is_fmt: true
+		is_fmt:       true
 		fatal_errors: false
 	}
 	mut table := ast.new_table()
@@ -284,7 +279,7 @@ pub fn (mut p Parser) parse_file(path string) {
 
 	// eprintln('Parsing $path')
 	mut f := CFile{
-		raw: c_code
+		raw:  c_code
 		path: path
 	}
 
@@ -905,10 +900,10 @@ fn (p Parser) parse_typedef_enum(lines []string) []CEnum {
 			}
 
 			fields << CEnumField{
-				raw: line_no_comment
-				name: name
-				value: val.trim(' ')
-				comment: used_comment
+				raw:               line_no_comment
+				name:              name
+				value:             val.trim(' ')
+				comment:           used_comment
 				comment_was_above: comment_was_above
 			}
 		}
@@ -923,11 +918,11 @@ fn (p Parser) parse_typedef_enum(lines []string) []CEnum {
 	// eprintln(members)
 	for enum_id in raw_enum_ids {
 		c_enums << CEnum{
-			raw: raw
-			name: enum_id
-			prefix: p.conf.enum_id_prefix
+			raw:        raw
+			name:       enum_id
+			prefix:     p.conf.enum_id_prefix
 			is_typedef: true
-			fields: fields
+			fields:     fields
 		}
 	}
 
@@ -1085,7 +1080,7 @@ fn (p Parser) parse_define(lines []string) CDefine {
 	lns := lines.join(' ')
 	if lns.contains(r'\ ') {
 		return CDefine{
-			raw: '// TODO ' + lns
+			raw:    '// TODO ' + lns
 			prefix: p.conf.define_id_prefix
 		}
 	}
@@ -1101,10 +1096,10 @@ fn (p Parser) parse_define(lines []string) CDefine {
 	//}
 
 	return CDefine{
-		raw: lines.join('\n')
-		name: name
+		raw:    lines.join('\n')
+		name:   name
 		prefix: p.conf.define_id_prefix
-		value: value
+		value:  value
 	}
 }
 
@@ -1233,11 +1228,11 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		//@ eprintln('C Struct: $line')
 		return [
 			CStruct{
-				raw: raw
-				name: c_name
-				prefix: p.conf.struct_id_prefix
+				raw:        raw
+				name:       c_name
+				prefix:     p.conf.struct_id_prefix
 				is_typedef: is_typedef
-				is_union: is_union
+				is_union:   is_union
 			},
 		]
 	}
@@ -1357,11 +1352,11 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 				}
 
 				fields << CField{
-					raw: member
-					kind: kind
-					name: name
+					raw:           member
+					kind:          kind
+					name:          name
 					comment_above: comment_above
-					comment: comment
+					comment:       comment
 					// embedded_struct: embedded_struct
 				}
 
@@ -1433,11 +1428,11 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 			}
 
 			fields << CField{
-				raw: member
-				kind: kind
-				name: name
-				comment_above: comment_above
-				comment: comment
+				raw:             member
+				kind:            kind
+				name:            name
+				comment_above:   comment_above
+				comment:         comment
 				embedded_struct: embedded_struct
 			}
 
@@ -1460,12 +1455,12 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		}
 
 		c_struct := CStruct{
-			raw: raw
-			name: struct_id
-			prefix: p.conf.struct_id_prefix
+			raw:        raw
+			name:       struct_id
+			prefix:     p.conf.struct_id_prefix
 			is_typedef: is_typedef
-			is_union: is_union
-			fields: fields
+			is_union:   is_union
+			fields:     fields
 		}
 
 		c_structs << c_struct
@@ -1686,10 +1681,10 @@ fn parse_typedef_alias(line string) !CAlias {
 		name := split[0].trim_space()
 		alias := split[1].trim_space()
 		return CAlias{
-			raw: raw
-			name: name
+			raw:   raw
+			name:  name
 			alias: alias
-			typ: .primitive
+			typ:   .primitive
 		}
 	}
 	if split.len == 3 {
@@ -1698,10 +1693,10 @@ fn parse_typedef_alias(line string) !CAlias {
 		alias := split[2].trim_space()
 		if typ == 'struct' {
 			return CAlias{
-				raw: raw
-				name: name
+				raw:   raw
+				name:  name
 				alias: alias
-				typ: ._struct
+				typ:   ._struct
 			}
 		}
 	}
@@ -1733,10 +1728,10 @@ fn parse_typedef_fn_callback(lines []string) CFnCallbackSig {
 	}
 
 	return CFnCallbackSig{
-		raw: raw
+		raw:         raw
 		return_type: return_type
-		name: name
-		args: args
+		name:        name
+		args:        args
 	}
 }
 
