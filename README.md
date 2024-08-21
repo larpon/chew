@@ -22,14 +22,14 @@ solely for personal use - I released it only because some *might* find it useful
 
 # Install
 
-`git clone https://github.com/Larpon/chew.git ~/.vmodules`
+`git clone https://github.com/larpon/chew.git ~/.vmodules`
 
 # Usage
 
 Currently `chew` expects that you setup your own V <-> C includes for each module you want to wrap.
 
 Basically `chew` expects your V module to have a sub-folder named `c` with V files doing the actual C setup.
-See [Larpon/miniaudio](https://github.com/Larpon/miniaudio/blob/master/c/miniaudio.c.v) for an example setup that works.
+See [Larpon/miniaudio](https://github.com/larpon/miniaudio/blob/master/c/miniaudio.c.v) for an example setup that works.
 
 The output(s) of chew is then expected to live at the module root - where it can do `import c`.
 
