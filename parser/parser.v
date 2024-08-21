@@ -253,9 +253,9 @@ pub fn vfmt(v_code string) string {
 		is_fmt: true
 		fatal_errors: false
 	}
-	table := ast.new_table()
-	file_ast := vparser.parse_text(v_code, 'memory/1.v', table, .parse_comments, &fpref)
-	fmtd_v_code := fmt.fmt(file_ast, table, &fpref, false)
+	mut table := ast.new_table()
+	file_ast := vparser.parse_text(v_code, 'memory/1.v', mut table, .parse_comments, &fpref)
+	fmtd_v_code := fmt.fmt(file_ast, mut table, &fpref, false)
 	unsafe { free(table) }
 	return fmtd_v_code
 }
