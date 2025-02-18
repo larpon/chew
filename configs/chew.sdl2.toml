@@ -1,0 +1,59 @@
+lib_name = 'sdl'
+
+[api]
+    export = 'SDLCALL'
+    inline = 'SDL_FORCE_INLINE'
+
+[v]
+	fmt = false
+
+[skip]
+	files = [
+		'SDL_assert.h', # TODO?
+		'SDL_test_fuzzer.h',
+		'SDL_opengles2_gl2platform.h',
+		'SDL_test_crc32.h',
+		'SDL_syswm.h',
+		'SDL_test_random.h',
+		'SDL_test_images.h',
+		'SDL_opengl_glext.h',
+		'SDL_opengles2_gl2.h',
+		'close_code.h',
+		'SDL_test_md5.h',
+		'SDL_test_harness.h',
+		'SDL_test_log.h',
+		'begin_code.h',
+		'SDL_test_compare.h',
+		'SDL_test_assert.h',
+		'SDL_egl.h',
+		'SDL_opengl.h',
+		'SDL_test_common.h',
+		'SDL_test_memory.h',
+		'SDL_test.h',
+		'SDL_opengles2_khrplatform.h',
+		'SDL_test_font.h',
+		'SDL_opengles2.h',
+		'SDL_opengles2_gl2ext.h',
+		'SDL_opengles.h'
+	]
+
+[prefix]
+	struct = 'SDL_'
+	enum = 'SDL_'
+	define = 'SDL_'
+	function = 'SDL_'
+
+[primitives]
+	UInt64 = 'u64'
+	Int64 = 'i64'
+	UInt32 = 'u32'
+	Int32 = 'int'
+	UInt16 = 'u16'
+	Int16 = 'i16'
+	UInt8 = 'u8'
+	Int8 = 'i8'
+	Bool32 = 'bool'
+	Bool8 = 'bool'
+
+[stop-marker]
+	line_starts_with = '#endif /* SDL_'

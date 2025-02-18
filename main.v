@@ -27,7 +27,7 @@ fn main() {
 		conf: conf
 	}
 	for c_header in c_headers {
-		parser.parse_file(c_header)
+		parser.parse_file(c_header)!
 	}
 
 	lib_name := conf.lib_name
@@ -36,7 +36,8 @@ fn main() {
 		mut file_name := os.file_name(file.path).all_before_last('.').to_lower()
 		if c_headers.len > 1 {
 			prefix_id := conf.struct_id_prefix.to_lower()
-			file_name += file_name.all_after(prefix_id)
+			// SDL3
+			// file_name += file_name.all_after(prefix_id)
 			file_name = '${lib_name}.${file_name}'
 		}
 
@@ -44,8 +45,8 @@ fn main() {
 
 		// Write file to disk before fmt
 		tmp_path := os.temp_dir()
-		os.write_file(os.real_path(os.join_path(tmp_path, '${file_name}.auto.pre-fmt.c.v')),
-			v_code) or { panic(err) }
+		// os.write_file(os.real_path(os.join_path(tmp_path, '${file_name}.auto.pre-fmt.c.v')),
+		// 	v_code) or { panic(err) }
 
 		// v_code = chep.vfmt(v_code) // or {	}
 		os.write_file(os.real_path(os.join_path(output_path, '${file_name}.auto.c.v')),

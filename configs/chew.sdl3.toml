@@ -1,0 +1,172 @@
+lib_name = 'sdl'
+
+[api]
+    export = 'SDLCALL'
+    inline = 'SDL_FORCE_INLINE'
+
+[v]
+	fmt = false
+
+[skip]
+	files = [
+		'SDL.h',
+		'SDL_endian.h', # TODO: tricky with lots of macros
+		'SDL_assert.h', # TODO?
+		'SDL_begin_code.h',
+		'SDL_close_code.h',
+		'SDL_egl.h',
+		'SDL_opengl.h',
+		'SDL_opengl_glext.h',
+		'SDL_opengles2_gl2.h',
+		'SDL_opengles2_gl2platform.h',
+		'SDL_opengles2_khrplatform.h',
+		'SDL_opengles2.h',
+		'SDL_opengles2_gl2ext.h',
+		'SDL_opengles.h',
+    'SDL_test_font.h',
+    'SDL_test_compare.h',
+    'SDL_test_common.h',
+    'SDL_test_memory.h',
+    'SDL_test_md5.h',
+    'SDL_test_log.h',
+    'SDL_test_harness.h',
+    'SDL_test_fuzzer.h',
+    'SDL_test_crc32.h',
+    'SDL_test_assert.h',
+    'SDL_test.h'
+	]
+
+# SDL_revision.h
+# SDL_vulkan.h
+# SDL_video.h
+# SDL_version.h
+# SDL_tray.h
+# SDL_touch.h
+# SDL_timer.h
+# SDL_time.h
+# SDL_system.h
+# SDL_surface.h
+# SDL_storage.h
+# SDL_sensor.h
+# SDL_scancode.h
+# SDL_render.h
+# SDL_rect.h
+# SDL_properties.h
+# SDL_process.h
+# SDL_platform_defines.h
+# SDL_platform.h
+# SDL_pixels.h
+# SDL_mutex.h
+# SDL_mouse.h
+# SDL_misc.h
+# SDL_metal.h
+# SDL_messagebox.h
+# SDL_log.h
+# SDL_locale.h
+# SDL_loadso.h
+# SDL_keycode.h
+# SDL_keyboard.h
+# SDL_joystick.h
+# SDL_iostream.h
+# SDL_init.h
+# SDL_hidapi.h
+# SDL_haptic.h
+# SDL_guid.h
+# SDL_gamepad.h
+# SDL_filesystem.h
+# SDL_events.h
+# SDL_error.h
+# SDL_dialog.h
+# SDL_cpuinfo.h
+# SDL_clipboard.h
+# SDL_camera.h
+# SDL_blendmode.h
+# SDL_bits.h
+# SDL_audio.h
+# SDL_atomic.h
+# SDL_asyncio.h
+# SDL_thread.h
+# SDL_stdinc.h
+# SDL_power.h
+# SDL_pen.h
+# SDL_main.h
+# SDL_intrin.h
+# SDL_hints.h
+# SDL_gpu.h
+# SDL_oldnames.h
+# SDL_main_impl.h
+# SDL_copying.h
+
+[prefix]
+	struct = 'SDL_'
+	enum = 'SDL_'
+	define = 'SDL_'
+	function = 'SDL_'
+
+[primitives]
+	UInt64 = 'u64'
+	Uint64 = 'u64'
+	Int64 = 'i64'
+	UInt32 = 'u32'
+	Uint32 = 'u32'
+	Int32 = 'int'
+	UInt16 = 'u16'
+	Uint16 = 'u16'
+	Int16 = 'i16'
+	UInt8 = 'u8'
+	Uint8 = 'u8'
+	Int8 = 'i8'
+	Bool32 = 'bool'
+	Bool8 = 'bool'
+  Sint8 = 'i8'
+  Sint16 = 'i16'
+  Sint32 = 'i32'
+  Sint64 = 'i64'
+  SDL_CompareCallback                  = 'CompareCallback'
+  SDL_CompareCallback_r                = 'CompareCallbackR'
+  SDL_AudioStream                      = 'AudioStream'
+  SDL_AudioStreamCallback              = 'AudioStreamCallback'
+  SDL_AudioPostmixCallback             = 'AudioPostmixCallback'
+  SDL_CameraSpec                       = 'CameraSpec'
+  SDL_ClipboardDataCallback            = 'ClipboardDataCallback'
+  SDL_ClipboardCleanupCallback         = 'ClipboardCleanupCallback'
+  SDL_DialogFileCallback               = 'DialogFileCallback'
+  SDL_EventFilter                      = 'EventFilter'
+  SDL_EnumerateDirectoryCallback       = 'EnumerateDirectoryCallback'
+  SDL_GamepadBinding                   = 'GamepadBinding'
+  SDL_GPUTexture                       = 'GPUTexture'
+  SDL_GPUBuffer                        = 'GPUBuffer'
+  SDL_GPUFence                         = 'GPUFence'
+  SDL_HintCallback                     = 'HintCallback'
+  SDL_MainThreadCallback               = 'MainThreadCallback'
+  SDL_Locale                           = 'Locale'
+  SDL_LogOutputFunction                = 'LogOutputFunction'
+  SDL_CleanupPropertyCallback          = 'CleanupPropertyCallback'
+  SDL_EnumeratePropertiesCallback      = 'EnumeratePropertiesCallback'
+  SDL_Surface                          = 'Surface'
+  SDL_WindowsMessageHook               = 'WindowsMessageHook'
+  SDL_X11EventHook                     = 'X11EventHook'
+  SDL_iOSAnimationCallback             = 'iOSAnimationCallback'
+  SDL_RequestAndroidPermissionCallback = 'RequestAndroidPermissionCallback'
+  SDL_ThreadFunction                   = 'ThreadFunction'
+  SDL_TLSDestructorCallback            = 'TLSDestructorCallback'
+  SDL_TimerCallback                    = 'TimerCallback'
+  SDL_NSTimerCallback                  = 'NSTimerCallback'
+  SDL_Finger                           = 'Finger'
+  SDL_TrayEntry                        = 'TrayEntry'
+  SDL_TrayCallback                     = 'TrayCallback'
+  SDL_DisplayMode                      = 'DisplayMode'
+  SDL_Window                           = 'Window'
+  SDL_HitTest                          = 'HitTest'
+  SDL_GLContext                        = 'GLContext'
+  SDL_EGLAttribArrayCallback           = 'EGLAttribArrayCallback'
+  SDL_EGLIntArrayCallback              = 'EGLIntArrayCallback'
+  SDL_AppInit_func                     = 'AppInitFunc'
+  SDL_AppIterate_func                  = 'AppIterateFunc'
+  SDL_AppEvent_func                    = 'AppEventFunc'
+  SDL_AppQuit_func                     = 'AppQuitFunc'
+  SDL_malloc_func                      = 'MallocFunc'
+  SDL_calloc_func                      = 'CallocFunc'
+  SDL_realloc_func                     = 'ReallocFunc'
+  SDL_free_func                        = 'FreeFunc'
+  # SDL_iconv_t

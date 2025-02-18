@@ -1,0 +1,33 @@
+lib_name = 'box2d'
+
+[api]
+    export = 'B2_API'
+    inline = 'B2_INLINE'
+
+[prefix]
+	struct = 'b2'
+	enum = 'b2'
+	define = 'B2_'
+	function = 'b2'
+
+[rewrite]
+
+    [rewrite.value]
+    [rewrite.value.const]
+        'null' = 'unsafe{ nil }'
+
+[primitives]
+	uint64_t = 'u64'
+	int64_t = 'i64'
+	uint32_t = 'u32'
+	int32_t = 'int'
+	uint16_t = 'u16'
+	int16_t = 'i16'
+	uint8_t = 'u8'
+	int8_t = 'i8'
+
+[skip]
+    typedefs = []
+    keywords = []
+    files = []
+

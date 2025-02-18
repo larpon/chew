@@ -95,12 +95,12 @@ const keywords = {
 	'shared':     '@shared'
 	'lock':       '@lock'
 	'rlock':      '@rlock'
-	'type':       '@type'
+	// 'type':       '@type'
 	'for':        'fro'
 	'fn':         'func'
 	'true':       'yes'
 	'false':      'nope'
-	'continue':   'keepgoing'
+	// 'continue':   'keepgoing'
 	'break':      'smash'
 	'import':     'imported'
 	'unsafe':     'not_safe'
@@ -130,7 +130,7 @@ const empty_toml_doc = toml.Doc{
 }
 
 pub struct Config {
-	toml_doc toml.Doc = parser.empty_toml_doc
+	toml_doc toml.Doc = empty_toml_doc
 pub:
 	lib_name string
 
@@ -205,10 +205,13 @@ fn (c Config) get_string(query string) string {
 }
 
 pub fn config_from_toml(file string) Config {
-	mut toml_doc := parser.empty_toml_doc
+	mut toml_doc := empty_toml_doc
 	if os.is_file(file) {
 		eprintln('Using ${file}')
-		toml_doc = toml.parse_file(file) or { parser.empty_toml_doc }
+		toml_doc = toml.parse_file(file) or {
+			// parser.empty_toml_doc
+			panic(err)
+		}
 	}
 	assert !isnil(toml_doc.ast)
 	// return toml.parse_text('') or { empty_toml_doc }
@@ -270,7 +273,7 @@ pub mut:
 	fn_callbacks []CFnCallbackSig
 }
 
-pub fn (mut p Parser) parse_file(path string) {
+pub fn (mut p Parser) parse_file(path string) ! {
 	if os.file_name(path) in p.conf.skip_files {
 		eprintln('Skipping ${path}')
 		return
@@ -283,7 +286,7 @@ pub fn (mut p Parser) parse_file(path string) {
 		path: path
 	}
 
-	p.parse(mut f)
+	p.parse(mut f)!
 }
 
 pub fn (mut p Parser) file_to_v_code(f CFile) !string {
@@ -313,12 +316,55 @@ pub const used_import = c.used_import
 	v_code += '//
 
 '
+	$if debug {
+		if p.aliases.len > 0 {
+			v_code += '// C typedef aliases used\n'
+			for _, alias in p.aliases {
+				if alias.name != alias.alias {
+					mut v_alias := p.c_to_v_type_name(alias.name)
+					v_code += '// ${alias.alias} -> ${alias.name} -> ${v_alias} (${p.c_to_v_alias_type(alias.alias)} ${alias.typ})\n'
+				}
+			}
+			v_code += '\n'
+		}
+	}
+
 	if p.aliases.len > 0 {
-		v_code += '// C typedef aliases used\n'
 		for _, alias in p.aliases {
-			if alias.name != alias.alias {
+			if alias.name != alias.alias && alias.typ == .primitive {
 				mut v_alias := p.c_to_v_type_name(alias.name)
-				v_code += '// ${alias.alias} -> ${alias.name} -> ${v_alias}\n'
+				// v_code += '// ${alias.alias} -> ${alias.name} -> ${v_alias} (${p.c_to_v_alias_type(alias.alias)} ${alias.typ})\n'
+				if alias.def_file == f.path {
+					// eprintln('${alias.alias} def in ${filename}')
+
+					a_sp := alias.comment.split('\n')
+					mut alias_comment := ''
+					for i, ca in a_sp {
+						mut cleaned := ca.replace('/*', '').replace('*/', '').replace('*<',
+							'')
+						// eprintln('cleaned: ${cleaned}')
+						if cleaned.starts_with(' *') {
+							cleaned = cleaned.replace(' *', '')
+						}
+						if cleaned.starts_with('* ') {
+							cleaned = cleaned.replace('* ', '')
+						}
+
+						cleaned = cleaned.replace('   ', '').replace('  ', '').replace('  ',
+							' ')
+						if cleaned.trim(' ') == ''
+							&& (i == 0 || i == a_sp.len - 1 || i == a_sp.len - 2) {
+							continue
+						}
+						alias_comment += '// ' + cleaned + '\n'
+					}
+
+					alias_comment = alias_comment.replace('// *\n', '')
+					alias_comment = alias_comment.replace('//  ', '// ')
+					v_prim_alias_type := '${alias_comment}pub type ${p.c_to_v_alias_type(alias.alias)} = ${v_alias}'
+					v_code += v_prim_alias_type + '\n\n'
+					// eprintln(v_prim_alias_type)
+				}
 			}
 		}
 		v_code += '\n'
@@ -330,7 +376,11 @@ pub const used_import = c.used_import
 			CDefine {
 				code := p.gen_v_const(node) or { 'TODO ' + err.msg() + ': ' + node.raw }
 				if code.starts_with('TODO') {
-					v_code += '/' + '*\n' + code + '\n*' + '/\n\n'
+					if code.count('\n') <= 1 {
+						v_code += '// ' + code.trim(' ') + '\n\n'
+					} else {
+						v_code += '/' + '*\n' + code.trim(' ') + '\n*' + '/\n\n'
+					}
 				} else {
 					v_code += code + '\n\n'
 				}
@@ -347,7 +397,7 @@ pub const used_import = c.used_import
 				//}
 				wrapper_code, fn_name := p.gen_v_wrapper(node)
 
-				v_code += '// C: `${node.raw.replace('  ', '').trim_right(';')}`\n'
+				v_code += '// @C: `${node.raw.replace('  ', '').trim_right(';')}`\n'
 				v_code += p.gen_vc_fn_sig(node) + '\n\n'
 
 				mut comment_code := c_to_v_comment(node.comment, fn_name)
@@ -387,7 +437,7 @@ pub const used_import = c.used_import
 	return v_code
 }
 
-fn (mut p Parser) parse(mut cf CFile) {
+fn (mut p Parser) parse(mut cf CFile) ! {
 	// mut peek_line := ''
 	mut in_comment := false
 	mut comment := ''
@@ -400,7 +450,7 @@ fn (mut p Parser) parse(mut cf CFile) {
 
 		stop_marker := p.conf.get_string('stop-marker.line_starts_with')
 		if stop_marker != '' && line.starts_with(stop_marker) {
-			println('Stopping parsing at line ${i}')
+			println('Stopping parsing at line ${cf.path}:${i} / ${lines.len}')
 			break
 		}
 
@@ -456,6 +506,11 @@ fn (mut p Parser) parse(mut cf CFile) {
 		}
 		if line.starts_with('// ') {
 			comment += line + '\n'
+			comment_count++
+			continue
+		}
+		if line.starts_with('/// ') {
+			comment += line.replace_once('/// ', '// ') + '\n'
 			comment_count++
 			continue
 		}
@@ -524,7 +579,7 @@ fn (mut p Parser) parse(mut cf CFile) {
 		if line.starts_with('typedef struct') || line.starts_with('typedef union') {
 			if line.contains(';') {
 				if !line.contains('{') {
-					mut alias := parse_typedef_alias(line) or {
+					mut alias := parse_typedef_alias(line, cf.path) or {
 						eprintln(err)
 						continue
 					}
@@ -532,7 +587,9 @@ fn (mut p Parser) parse(mut cf CFile) {
 					comment = ''
 					p.aliases[alias.alias] = alias
 					// cf.nodes << alias
-					continue
+					if alias.typ != ._struct {
+						continue
+					}
 				}
 
 				mut stts := p.parse_struct([line]) or {
@@ -576,9 +633,10 @@ fn (mut p Parser) parse(mut cf CFile) {
 			}
 		}
 
-		if line.starts_with('typedef ') && line.replace(' ', '').contains(')(') {
+		if line.starts_with('typedef ') && (line.replace(' ', '').contains(')(')
+			|| line.count('(') == line.count(')')) {
 			if line.contains(';') {
-				mut fnts := parse_typedef_fn_callback([line])
+				mut fnts := parse_typedef_fn_callback([line])!
 				fnts.comment = comment
 				comment = ''
 				p.fn_callbacks << fnts
@@ -590,7 +648,7 @@ fn (mut p Parser) parse(mut cf CFile) {
 		}
 
 		if line.starts_with('typedef ') && line.contains(';') {
-			mut alias := parse_typedef_alias(line) or {
+			mut alias := parse_typedef_alias(line, cf.path) or {
 				eprintln(err)
 				continue
 			}
@@ -645,7 +703,14 @@ fn (mut p Parser) parse(mut cf CFile) {
 			}
 		}
 
-		if line.starts_with(p.conf.api_export) { //|| line.starts_with('extern DECLSPEC ') { // 'SOKOL_GP_API_DECL'
+		// SDL3
+		mut or_true := line.starts_with('extern SDL_DECLSPEC ')
+		// SDL2
+		// or_true = or_true || line.starts_with('extern DECLSPEC ')
+		// Sokol GP
+		// 'SOKOL_GP_API_DECL'
+
+		if line.starts_with(p.conf.api_export) || or_true {
 			api_export := eat_lines_until(i, lines, fn (l string) bool {
 				return l.contains(';')
 			})
@@ -656,7 +721,9 @@ fn (mut p Parser) parse(mut cf CFile) {
 				continue
 			}
 
-			mut fnc := p.parse_fn_def(api_export)
+			mut fnc := p.parse_fn_def(api_export) or {
+				return error('${cf.path}:${i} parsing function definition failed')
+			}
 			fnc.comment = comment
 			comment = ''
 			cf.nodes << fnc
@@ -695,6 +762,7 @@ struct CArg {
 struct CFnSig {
 mut:
 	raw         string
+	todo        string
 	return_type string
 	name        string
 	args        []CArg
@@ -727,10 +795,11 @@ enum CAliasType {
 }
 
 struct CAlias {
-	raw   string
-	name  string
-	alias string
-	typ   CAliasType = .primitive
+	raw      string
+	name     string
+	alias    string
+	typ      CAliasType = .primitive
+	def_file string
 mut:
 	comment string
 }
@@ -741,6 +810,7 @@ struct CStruct {
 	prefix     string // 'ma_'
 	is_typedef bool
 	is_union   bool
+	is_opaque  bool
 	fields     []CField
 mut:
 	comment string
@@ -820,7 +890,7 @@ fn (p Parser) parse_typedef_enum(lines []string) []CEnum {
 
 	flat_reblow = flat_reblow.all_after('{').all_before_last('}').trim(' ')
 
-	mut re := parser.regex_block_comment
+	mut re := regex_block_comment
 	// type FnReplace = fn (re RE, in_txt string, start int, end int) string
 	// .replace_by_fn(in_txt string, repl_fn FnReplace)
 	mut flat_blocks := re.replace_by_fn(flat_reblow, fn (re regex.RE, in_txt string, start int, end int) string {
@@ -876,7 +946,7 @@ fn (p Parser) parse_typedef_enum(lines []string) []CEnum {
 				val = l_split[1].replace(',', '')
 			}
 
-			if _ := parser.keywords[name] {
+			if _ := keywords[name] {
 				name = '@' + name // rewrite
 			}
 			name = name.trim(' ')
@@ -952,6 +1022,25 @@ fn rewrite_known_v_pitfall_name(name string, prefix string) string {
 	return name
 }
 
+fn sanetize_comment(comment string) string {
+	if comment != '' {
+		comment_lines := comment.split('\n')
+		mut final_comment_line := ''
+		mut final_comment_lines := []string{}
+		for comment_line in comment_lines {
+			final_comment_line = comment_line.replace('/*', '').replace('*/', '').replace('*<',
+				'').trim(' /')
+				.replace(r'* \brief', '').replace(r'\brief', '')
+				.replace('   ', '').replace('  ', '').replace('  ', ' ')
+
+			final_comment_lines << '// ' + final_comment_line
+		}
+		final_comment := final_comment_lines.join('\n')
+		return final_comment
+	}
+	return comment
+}
+
 fn (p Parser) gen_v_enum_def(ce CEnum) string {
 	mut v_code := ''
 
@@ -964,6 +1053,11 @@ fn (p Parser) gen_v_enum_def(ce CEnum) string {
 
 	mut enum_name_no_prefix := ce.name.replace(ce.prefix, '')
 	mut enum_name := ce.v_name() or { enum_name_no_prefix }
+
+	enum_comment := sanetize_comment(ce.comment)
+	if enum_comment != '' {
+		v_code += '${enum_comment}\n'
+	}
 
 	v_code += '// ${enum_name} is C.${ce.name}\n'
 	v_code += 'pub enum ${enum_name} {\n'
@@ -1039,11 +1133,13 @@ fn (p Parser) gen_v_enum_def(ce CEnum) string {
 		}
 		// TODO end
 
-		if _ := parser.keywords[name] {
+		if _ := keywords[name] {
 			name = '@' + name
 		}
 
-		mut comment := field.comment //.replace('*<', '`$name`')
+		mut comment := field.comment
+		// SDL2 / SDL3
+		comment = comment.replace('*<', '`${name}`')
 
 		mut val := 'C.' + field.name
 
@@ -1131,7 +1227,7 @@ fn (cd CDefine) v_name() !string {
 		name = name.all_after(cd.prefix)
 	}
 	name = name.to_lower()
-	if _ := parser.keywords[name] {
+	if _ := keywords[name] {
 		name = '@' + name // rewrite
 	}
 	return name
@@ -1159,8 +1255,17 @@ fn (cd CDefine) tail_comment() string {
 fn (p Parser) gen_v_const(cd CDefine) !string {
 	mut v_code := '/' + '* ' + cd.raw + ' *' + '/'
 
+	c_name := cd.name
+	mut v_c_name := 'C.' + c_name
+
 	name := cd.v_name()!
 	mut value := cd.v_value()!
+
+	// TODO: if use C def
+	if c_name !in ['false', 'true'] && !c_name.contains('(') {
+		value = v_c_name + ' // ' + value
+	}
+
 	if override := p.conf.rewrite['value']['const'][name] {
 		value = override
 	}
@@ -1225,6 +1330,16 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 		if tokens.len > 2 {
 			c_name = tokens[2].trim('{').trim(';')
 		}
+
+		mut is_opaque := false
+		// Parse opaque struct type
+		if is_typedef && !line.contains('{') && !line.contains('}') && line.contains(';')
+			&& tokens.len >= 4 {
+			c_name_1 := tokens[2].trim(';')
+			c_name_2 := tokens[3].trim(';')
+			is_opaque = c_name_1 == c_name_2
+		}
+
 		//@ eprintln('C Struct: $line')
 		return [
 			CStruct{
@@ -1233,6 +1348,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 				prefix:     p.conf.struct_id_prefix
 				is_typedef: is_typedef
 				is_union:   is_union
+				is_opaque:  is_opaque
 			},
 		]
 	}
@@ -1347,7 +1463,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 				}
 
 				mut name := mbr_clean.trim(',')
-				if _ := parser.keywords[name] {
+				if _ := keywords[name] {
 					name = '@' + name // rewrite
 				}
 
@@ -1423,7 +1539,7 @@ fn (p Parser) parse_struct(lines []string) ![]CStruct {
 				}
 			}
 
-			if _ := parser.keywords[name] {
+			if _ := keywords[name] {
 				name = '@' + name // rewrite
 			}
 
@@ -1500,7 +1616,7 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 
 	mut st := strct
 	/*
-	v_code += '// NOTE\n'
+	v_code += '// NOTE:\n'
 	v_code += '/'+'*'
 	v_code += st.raw+'\n'
 	//v_code += '$st\n'
@@ -1513,13 +1629,30 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 
 	v_name := st.v_name()!
 
+	st_comment := sanetize_comment(st.comment)
+	if st_comment != '' {
+		v_code += '${st_comment}\n'
+	}
+
 	if st.is_typedef {
-		v_code += '[typedef]\n'
+		v_code += '@[typedef]\n'
+	}
+
+	if st.is_opaque {
+		assert st.fields.len == 0
+		v_code += '@[noinit]\n'
 	}
 
 	type_keyword := if st.is_union { 'union' } else { 'struct' }
 
 	v_code += 'pub ${type_keyword} C.${st.name} {'
+
+	if st.is_opaque {
+		// v_kind := p.c_to_v_type_name(st.name)
+		// dump(v_kind)
+		// v_code += '}\n\npub type ${v_kind} = C.${st.name}'
+		v_code += '\n\t// NOTE: Opaque type\n'
+	}
 
 	if st.fields.len > 0 {
 		v_code += '\npub mut:\n'
@@ -1553,7 +1686,7 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 		mut is_fn_callback_sig := false
 		if field.raw.count('(') > 0 {
 			if field.raw.count('(') > 1 {
-				fnts := parse_typedef_fn_callback([field.raw])
+				fnts := parse_typedef_fn_callback([field.raw])!
 				kind = p.gen_v_fn_callback_field_def(fnts)
 				is_fn_callback_sig = true
 				name = name.all_after('(').trim('* ')
@@ -1582,29 +1715,12 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 			kind = '&'.repeat(field.name.count('*')) + kind
 		}*/
 
-		mut comment := field.comment
-		if comment != '' {
-			comment = '// ' +
-				comment.replace('\n', ' ').replace('/*', '').replace('*/', '').replace('*<', '').trim(' ')
-			comment = comment.replace(r'* \brief', '').replace(r'\brief', '')
-			comment = comment.replace('   ', '').replace('  ', '').replace('  ', ' ')
-		}
+		comment := sanetize_comment(field.comment)
+		comment_above := sanetize_comment(field.comment_above)
 
 		mut init_value := ''
 		if kind.starts_with('&') {
 			init_value = '= unsafe { nil }'
-		}
-
-		mut comment_above := field.comment_above
-		if comment_above != '' {
-			ca_sp := comment_above.split('\n')
-			comment_above = ''
-			for ca in ca_sp {
-				mut cleaned := ca.replace('/*', '').replace('*/', '').replace('*<', '').trim(' ')
-				cleaned = cleaned.replace(r'* \brief', '').replace(r'\brief', '')
-				cleaned = cleaned.replace('   ', '').replace('  ', '').replace('  ', ' ')
-				comment_above += '// ' + cleaned + '\n'
-			}
 		}
 
 		mut field_v_code := '\t'
@@ -1670,7 +1786,7 @@ fn (p Parser) gen_v_struct_def(strct CStruct) !string {
 	return v_code
 }
 
-fn parse_typedef_alias(line string) !CAlias {
+fn parse_typedef_alias(line string, file_name string) !CAlias {
 	raw := '${line}'
 
 	normalized := raw.replace(' *', '* ')
@@ -1681,10 +1797,11 @@ fn parse_typedef_alias(line string) !CAlias {
 		name := split[0].trim_space()
 		alias := split[1].trim_space()
 		return CAlias{
-			raw:   raw
-			name:  name
-			alias: alias
-			typ:   .primitive
+			raw:      raw
+			name:     name
+			alias:    alias
+			typ:      .primitive
+			def_file: file_name
 		}
 	}
 	if split.len == 3 {
@@ -1693,45 +1810,82 @@ fn parse_typedef_alias(line string) !CAlias {
 		alias := split[2].trim_space()
 		if typ == 'struct' {
 			return CAlias{
-				raw:   raw
-				name:  name
-				alias: alias
-				typ:   ._struct
+				raw:      raw
+				name:     name
+				alias:    alias
+				typ:      ._struct
+				def_file: file_name
 			}
 		}
 	}
 	return error('could not parse C alias "${raw}"')
 }
 
-fn parse_typedef_fn_callback(lines []string) CFnCallbackSig {
+fn parse_typedef_fn_callback(lines []string) !CFnCallbackSig {
 	raw := '${lines.join('\n')}'
 
 	normalized := raw.replace(' *', '* ')
 
-	return_type := normalized.all_after('typedef').all_before('(').trim(' ')
-	name := normalized.all_after('(').all_before(')').trim(' ').all_after('*').trim(' ')
+	normalized_split := normalized.split(' ').map(it.trim(' '))
+	dump(normalized_split)
 
-	mut raw_args := normalized.all_after(')').all_after('(')
-	raw_args = raw_args.all_before_last(')')
+	test_return_type := normalized.all_after('typedef').all_before('(').trim(' ')
+	if test_return_type.count(' ') > 0 {
+		return_type := normalized_split[1] or {
+			return error('could not parse fn callback C signature return type "${raw}"')
+		}
+		name := normalized_split[2] or {
+			return error('could not parse fn callback C signature name "${raw}"')
+		}.all_before('(').trim(' ')
 
-	// eprintln('Raw args to function `$fn_name`: `$raw_args`')
-	mut raws := raw_args.split(',')
-	if raw_args.contains('(') && raw_args.contains(',') {
-		raws = preprocess_c_args(raw_args) or { panic(err) }
-	}
+		mut raw_args := normalized.all_after(name).all_after('(')
+		raw_args = raw_args.all_before_last(')')
 
-	raws = raws.filter(it != '')
+		// eprintln('Raw args to function `$fn_name`: `$raw_args`')
+		mut raws := raw_args.split(',')
+		if raw_args.contains('(') && raw_args.contains(',') {
+			raws = preprocess_c_args(raw_args)!
+		}
 
-	mut args := []CArg{}
-	for raw_arg in raws {
-		args << process_c_args(raw_arg)
-	}
+		raws = raws.filter(it != '')
 
-	return CFnCallbackSig{
-		raw:         raw
-		return_type: return_type
-		name:        name
-		args:        args
+		mut args := []CArg{}
+		for raw_arg in raws {
+			args << process_c_args(raw_arg)
+		}
+
+		return CFnCallbackSig{
+			raw:         raw
+			return_type: return_type
+			name:        name
+			args:        args
+		}
+	} else {
+		return_type := normalized.all_after('typedef').all_before('(').trim(' ')
+		name := normalized.all_after('(').all_before(')').trim(' ').all_after('*').trim(' ')
+
+		mut raw_args := normalized.all_after(')').all_after('(')
+		raw_args = raw_args.all_before_last(')')
+
+		// eprintln('Raw args to function `$fn_name`: `$raw_args`')
+		mut raws := raw_args.split(',')
+		if raw_args.contains('(') && raw_args.contains(',') {
+			raws = preprocess_c_args(raw_args)!
+		}
+
+		raws = raws.filter(it != '')
+
+		mut args := []CArg{}
+		for raw_arg in raws {
+			args << process_c_args(raw_arg)
+		}
+
+		return CFnCallbackSig{
+			raw:         raw
+			return_type: return_type
+			name:        name
+			args:        args
+		}
 	}
 }
 
@@ -1759,7 +1913,7 @@ fn (p Parser) gen_v_fn_callback_def(cbfn CFnCallbackSig) string {
 		comment_code = '// ${cb_name} is currently undocumented\n'
 	}
 	v_code += comment_code
-	v_code += '// C: ' + cbfn.raw + '\n'
+	v_code += '// @C: ' + cbfn.raw + '\n'
 	v_code += 'pub type ${cb_name} = fn (${args}) ' + p.c_to_v_type_name(cbfn.return_type).trim(' ')
 	return v_code
 }
@@ -1788,39 +1942,63 @@ fn (p Parser) gen_v_fn_callback_field_def(cbfn CFnCallbackSig) string {
 	//	comment_code = '// $cb_name is currently undocumented\n'
 	//}
 	// v_code += comment_code
-	// v_code += '// C: ' + cbfn.raw + '\n'
+	// v_code += '// @C: ' + cbfn.raw + '\n'
 	v_code += '${cb_name} fn (${args}) ' + p.c_to_v_type_name(cbfn.return_type).trim(' ')
 	return v_code
 }
 
-fn (p Parser) parse_fn_def(lines []string) CFnSig {
+fn (p Parser) parse_fn_def(lines []string) !CFnSig {
 	lns := lines.clone().join(' ')
 
 	api_inline := p.conf.api_inline
 
+	// TODO: SDL3
+	// if lines.any(it.contains('SDL_')) {
+	// 	if lines.any(it.contains('PRINTF_VARARG')) {
+	// 		eprintln('Skipping:\n---\n${lines.join('\n')}\n---')
+	// 		continue
+	// 	}
+	// 	if lines.any(it.contains('SDL_SCANF_VARARG')) {
+	// 		eprintln('Skipping:\n---\n${lines.join('\n')}\n---')
+	// 		continue
+	// 	}
+	// 	if lines.any(it.contains('SDL_TRY_ACQUIRE')) {
+	// 		eprintln('Skipping:\n---\n${lines.join('\n')}\n---')
+	// 		continue
+	// 	}
+	// 	if lines.any(it.contains('SDL_ALLOC_SIZE')) {
+	// 		eprintln('Skipping:\n---\n${lines.join('\n')}\n---')
+	// 		continue
+	// 	}
+	// }
+
 	if lines.any(it.contains('...')) {
 		return CFnSig{
-			raw: lns
+			todo: lns
 		}
 	}
 
 	mut sig := lns.all_before(';')
-	if lns.contains(api_inline) { // if lns.contains('SDL_FORCE_INLINE ') {
+	if lns.contains(api_inline) {
 		sig = lns.all_before_last('{')
 	}
 
-	mut clean_sig := sig //.all_after('DECLSPEC ')
+	mut clean_sig := sig
+	// SDL2 / SDL3
+	clean_sig = clean_sig.all_after('DECLSPEC ')
 
 	if sig.starts_with(api_inline) {
 		clean_sig = sig.all_after(api_inline).trim_space()
 	}
-	mut c_sig := p.c_signature(clean_sig)
+	mut c_sig := p.c_signature(clean_sig) or { return CFnSig{
+		todo: lns
+	} }
 	c_sig.raw = lns.replace('  ', '').trim(' ;')
 
 	return c_sig
 }
 
-fn (p Parser) c_signature(c_sig string) CFnSig {
+fn (p Parser) c_signature(c_sig string) !CFnSig {
 	sig := c_sig.replace(' *', '* ') // Normalize pointer positions
 	// eprintln('C signature: `$sig`')
 
@@ -1848,7 +2026,7 @@ fn (p Parser) c_signature(c_sig string) CFnSig {
 	// eprintln('Raw args to function `$fn_name`: `$raw_args`')
 	mut raws := raw_args.split(',')
 	if raw_args.contains('(') && raw_args.contains(',') {
-		raws = preprocess_c_args(raw_args) or { panic(err) }
+		raws = preprocess_c_args(raw_args)!
 	}
 
 	raws = raws.filter(it != '')
@@ -1858,7 +2036,14 @@ fn (p Parser) c_signature(c_sig string) CFnSig {
 		args << process_c_args(raw_arg)
 	}
 
-	return CFnSig{c_sig, return_type, fn_name, args, ''}
+	return CFnSig{
+		raw:         c_sig
+		todo:        ''
+		return_type: return_type
+		name:        fn_name
+		args:        args
+		comment:     ''
+	}
 }
 
 fn preprocess_c_args(arg string) ![]string {
@@ -1917,10 +2102,20 @@ fn process_c_args(arg string) CArg {
 	mut a := arg.trim(' ')
 	// eprintln('Processing `$arg`')
 	if a == 'void' {
-		return CArg{a, 'void', 'void', false}
+		return CArg{
+			full:     a
+			kind:     'void'
+			name:     'void'
+			is_const: false
+		}
 	}
 	if a == '...' {
-		return CArg{a, '...', '...', false}
+		return CArg{
+			full:     a
+			kind:     '...'
+			name:     '...'
+			is_const: false
+		}
 	}
 
 	a = a.replace('volatile', '')
@@ -1932,11 +2127,21 @@ fn process_c_args(arg string) CArg {
 	//})
 	if parts.len == 1 {
 		// E.g. SDL_AssertData* , const char*, const char* , int)
-		return CArg{a, 'void', 'void', false}
+		return CArg{
+			full:     a
+			kind:     'void'
+			name:     'void'
+			is_const: false
+		}
 	}
 	if a.contains('(') && a.contains(' ') {
 		parts = preprocess_c_arg_part(a) or {
-			return CArg{a, '...', '...', false}
+			return CArg{
+				full:     a
+				kind:     '...'
+				name:     '...'
+				is_const: false
+			}
 			// panic(err)
 		}
 	}
@@ -1949,7 +2154,7 @@ fn process_c_args(arg string) CArg {
 	mut c_type := parts[..parts.len - 1].join(' ').trim(' ')
 
 	if c_type == '' {
-		pts := parts[..parts.len - 1]
+		pts := parts[..parts.len - 1].clone()
 		c_type = pts[parts.len - 1].trim(' ')
 	}
 
@@ -1959,7 +2164,7 @@ fn process_c_args(arg string) CArg {
 
 	kind := c_type
 
-	name_part := parts[parts.len - 1..]
+	name_part := parts[parts.len - 1..].clone()
 	if name_part.len == 0 {
 		panic('Error getting name from `${arg}`')
 	}
@@ -1968,12 +2173,20 @@ fn process_c_args(arg string) CArg {
 
 	//@ eprintln('name: `$name`, kind: `$kind` from: "$a"')
 
-	return CArg{a, kind, name, is_const}
+	return CArg{
+		full:     a
+		kind:     kind
+		name:     name
+		is_const: is_const
+	}
 }
 
 // gen_vc_fn_sig generates a V C function signature from `sig`.
 // E.g. `fn C.malloc(int) &u8`
 fn (p Parser) gen_vc_fn_sig(sig CFnSig) string {
+	if sig.todo != '' {
+		return '/*\nTODO:\n${sig.todo}\n*/'
+	}
 	mut v_c_sig := 'fn C.${sig.name}('
 
 	mut args := ''
@@ -2033,7 +2246,7 @@ fn (p Parser) gen_vc_arg_pair(c_arg CArg) (string, string) {
 	mut kind := p.c_to_v_type_name(c_arg.kind)
 	mut name := c_to_v_var_name(c_arg.name)
 
-	if _ := parser.keywords[name] {
+	if _ := keywords[name] {
 		name = '@' + name // rewrite
 	}
 
@@ -2053,6 +2266,10 @@ fn (p Parser) gen_v_wrapper(sig CFnSig) (string, string) {
 	// mut v_type := ''
 	// mut c_type := ''
 	// mut ptr := false
+
+	if sig.todo != '' {
+		return '/*\nTODO:\n${sig.todo}\n*/', '/* TODO: */'
+	}
 
 	mut v_wrap_sig := 'pub fn '
 
@@ -2152,6 +2369,46 @@ fn (p Parser) v_fn_name(c_fn_name string) string {
 	return v_fn_name
 }
 
+fn (p Parser) c_to_v_alias_type(c_alias string) string {
+	c_alias_sanitized := c_alias.replace(p.conf.fn_id_prefix, '')
+
+	mut si := 0
+	mut parts := []string{}
+	for i, ch in c_alias_sanitized {
+		if ch.is_capital() {
+			parts << c_alias_sanitized[si..i].trim('_')
+			si = i
+		}
+		if i == c_alias_sanitized.len - 1 {
+			parts << c_alias_sanitized[si..].trim('_')
+		}
+	}
+	parts = parts.filter(it != '')
+	//@ eprintln('$c_alias_sanitized : $parts')
+	mut v_name := ''
+	for i, str in parts {
+		if str.len == 1 && str.is_upper() {
+			v_name += str.to_lower()
+			if i + 1 < parts.len {
+				if parts[i + 1].len > 1 {
+					v_name += '_'
+				}
+			}
+		} else {
+			v_name += str.to_lower() + '_'
+		}
+	}
+	v_name = v_name.trim_right('_').trim_left('_')
+	mut v_name_split := v_name.split('_')
+	v_name_split = v_name_split.map(it.capitalize())
+	v_name = v_name_split.join('')
+	//@ eprintln('Function name: $c_alias -> $v_name')
+	if v_name.ends_with('Id') {
+		v_name = v_name.all_before_last('Id') + 'ID'
+	}
+	return v_name
+}
+
 fn c_to_v_var_name(c_var_name string) string {
 	mut si := 0
 	mut parts := []string{}
@@ -2219,16 +2476,20 @@ fn (p Parser) c_to_v_type_name(typ string) string {
 	if alias := p.aliases[kind] {
 		a_kind := alias.name
 		// println('$typ is alias $alias.name -> $alias.alias')
-
 		if a_kind == 'void' {
 			if ptr != '' {
 				return 'voidptr'
 			}
 			return ''
 		}
-
-		if found := parser.c_to_v_type_map[a_kind] {
+		if found := c_to_v_type_map[a_kind] {
 			return ptr + found
+		}
+
+		if alias.typ == .primitive {
+			alias_type := p.c_to_v_alias_type(kind)
+			// eprintln('${kind} (${a_kind}/${typ}) -> ${ptr+alias_type}???')
+			return alias_type
 		}
 
 		if found := p.conf.primitives_map[a_kind] {
@@ -2243,13 +2504,20 @@ fn (p Parser) c_to_v_type_name(typ string) string {
 		return ''
 	}
 
-	if found := parser.c_to_v_type_map[kind] {
+	if found := c_to_v_type_map[kind] {
 		return ptr + found
 	}
 
 	if found := p.conf.primitives_map[kind] {
 		return ptr + found
 	}
+
+	// SDL3
+	// if kind.starts_with(p.conf.fn_id_prefix) {
+	//   sdl3_kind := ptr + kind.all_after(p.conf.fn_id_prefix)
+	//   eprintln(sdl3_kind)
+	//   return sdl3_kind
+	// }
 
 	return ptr + 'C.' + kind
 }
