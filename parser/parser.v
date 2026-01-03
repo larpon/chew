@@ -1824,23 +1824,24 @@ fn parse_typedef_alias(line string, file_name string) !CAlias {
 fn parse_typedef_fn_callback(lines []string) !CFnCallbackSig {
 	raw := '${lines.join('\n')}'
 
-	normalized := raw.replace(' *', '* ')
+	normalized := raw.replace(' *', '* ').replace('typedef const', 'typedef')
 
 	normalized_split := normalized.split(' ').map(it.trim(' '))
-	dump(normalized_split)
+	// dump(normalized_split)
+	// dump(normalized)
 
 	test_return_type := normalized.all_after('typedef').all_before('(').trim(' ')
 	if test_return_type.count(' ') > 0 {
-		return_type := normalized_split[1] or {
+		mut nsi := 1
+		return_type := normalized_split[nsi] or {
 			return error('could not parse fn callback C signature return type "${raw}"')
 		}
-		name := normalized_split[2] or {
+		name := normalized_split[nsi + 1] or {
 			return error('could not parse fn callback C signature name "${raw}"')
 		}.all_before('(').trim(' ')
 
 		mut raw_args := normalized.all_after(name).all_after('(')
 		raw_args = raw_args.all_before_last(')')
-
 		// eprintln('Raw args to function `$fn_name`: `$raw_args`')
 		mut raws := raw_args.split(',')
 		if raw_args.contains('(') && raw_args.contains(',') {
